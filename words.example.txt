@@ -1,0 +1,5 @@
+# One word per line. Lines starting with # are ignored.
+pedagogical
+clandestine
+serendipity
+constitution
