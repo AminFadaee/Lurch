@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.idea/
+.env
+.cache/
+data/
+build/
+scratch/
+words.txt

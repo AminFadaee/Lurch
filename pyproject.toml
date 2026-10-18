@@ -1,0 +1,33 @@
+[project]
+name = "lurch"
+version = "0.1.0"
+description = "Anki vocabulary decks with a card per meaning, synonyms, example sentences and audio, built from open data"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "genanki>=0.13.1",
+    "gensim>=4.3",
+    "kokoro>=0.9.4",
+    "nltk>=3.9",
+    "python-dotenv>=1.0",
+    "sentence-transformers>=3.0",
+    "soundfile>=0.12",
+    "torch>=2.4",
+    "wn>=1.0",
+    "wordfreq>=3.1",
+]
+
+[project.scripts]
+lurch = "lurch.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
