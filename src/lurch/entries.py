@@ -7,6 +7,12 @@ POS_NAMES = {"n": "noun", "v": "verb", "a": "adjective", "r": "adverb"}
 
 
 @dataclass
+class Candidate:
+    text: str
+    source: str
+
+
+@dataclass
 class Sentence:
     id: str
     text: str
@@ -24,6 +30,8 @@ class Sense:
     synonyms: list[str]
     related: list[str]
     antonyms: list[str]
+    definitions: list[Candidate] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
     examples: list[Sentence] = field(default_factory=list)
     sentences: list[Sentence] = field(default_factory=list)
     word_audio: str = ""
@@ -32,7 +40,7 @@ class Sense:
     @classmethod
     def from_dict(cls, data: dict) -> "Sense":
         sentences = {name: [Sentence(**sentence) for sentence in data[name]] for name in ("examples", "sentences")}
-        return cls(**{**data, **sentences})
+        return cls(**{**data, **sentences, "definitions": [Candidate(**candidate) for candidate in data["definitions"]]})
 
 
 @dataclass

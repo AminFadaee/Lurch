@@ -25,9 +25,9 @@ def run_sentences(settings: Settings) -> None:
     from lurch.llm import connect
     from lurch.sentences import attach_sentences, download
 
-    judge, writer = connect(settings)
+    arbiter, writer = connect(settings)
     entries = load_entries(settings.entries_file)
-    attach_sentences(entries, download(settings.cache_dir), judge, writer)
+    attach_sentences(entries, download(settings.cache_dir), arbiter, writer)
     save_entries(settings.entries_file, entries)
     for entry in entries:
         for line in entry.log:

@@ -9,7 +9,7 @@ from lurch.models import embed
 from lurch.morphology import content_terms, overlaps
 from lurch.wiktionary import Gloss
 
-CANDIDATES = 2
+CANDIDATES = 5
 MAX_WORDS = 18
 UNPLAIN = re.compile(r"\b(especially|usually|often|informal|archaic|obsolete)\b", re.I)
 ANAPHORA = re.compile(r"\b(such an?|this|these|the former|the latter)\b", re.I)
@@ -39,7 +39,8 @@ def rank_definitions(headword: str, meaning: Meaning) -> list[Gloss]:
         for i, gloss in enumerate(unique)
         if not is_circular(headword, gloss.text) and not ANAPHORA.search(gloss.text)
     ]
-    return [gloss for _, gloss in sorted(scored, key=lambda item: (len(item[1].text.split()) > MAX_WORDS, -item[0]))]
+    ranked = [gloss for _, gloss in sorted(scored, key=lambda item: -item[0])]
+    return [gloss for gloss in ranked if len(gloss.text.split()) <= MAX_WORDS] or ranked
 
 
 def key_word(headword: str, definitions: list[str]) -> str:

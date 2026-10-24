@@ -1,13 +1,12 @@
 import hashlib
 
-from lurch.circularity import classify, is_circular
+from lurch.circularity import classify
 from lurch.config import Settings
-from lurch.definitions import CANDIDATES, MAX_WORDS, key_word, rank_definitions
-from lurch.entries import POS_NAMES, Entry, Sense, Sentence
+from lurch.definitions import CANDIDATES, key_word, rank_definitions
+from lurch.entries import Candidate, Entry, Sense, Sentence
 from lurch.inventory import Meaning, build_meanings
 from lurch.models import embed
 from lurch.related import broader_terms, dedupe_spellings, frequency, related_terms
-from lurch.wiktionary import Gloss
 from lurch.wordnet import english
 from lurch.writer import Writer
 
@@ -17,7 +16,6 @@ MIN_SYNONYMS = 2
 MAX_SYNONYMS = 5
 MIN_SYNONYM_ZIPF = 3.0
 MIN_SYNONYM_SIMILARITY = 0.58
-GENERATED = "generated"
 
 
 def resolve(word: str) -> tuple[list[str], list[str]]:
@@ -48,28 +46,18 @@ def synonyms_of(headword: str, meaning: Meaning, definition: str) -> list[str]:
     return dedupe_spellings(list(dict.fromkeys(curated + listed)))[:MAX_SYNONYMS]
 
 
-def pick_definition(headword: str, meaning: Meaning, ranked: list[Gloss], writer: Writer | None, log: list[str]) -> tuple[str, str] | None:
-    if ranked:
-        return ranked[0].text, ranked[0].source
-    if writer:
-        reference = [gloss.text for gloss in meaning.glosses][:CANDIDATES]
-        written = [text for text in writer.definitions(headword, POS_NAMES[meaning.pos], reference) if len(text.split()) <= MAX_WORDS and not is_circular(headword, text)]
-        if written:
-            return written[0], GENERATED
-    log.append(f"no acceptable definition for {headword} ({meaning.glosses[0].text})")
-    return None
-
-
 def describe(headword: str, meaning: Meaning, use_neighbours: bool, writer: Writer | None, log: list[str]) -> Sense | None:
     synset = next((gloss.synset for gloss in meaning.glosses if gloss.synset is not None), None)
     ranked = rank_definitions(headword, meaning)
+    references = [gloss.text for gloss in meaning.glosses][:2]
+    if not ranked and not writer:
+        log.append(f"no usable definition for {headword} ({references[0]})")
+        return None
     synonyms = synonyms_of(headword, meaning, (ranked or meaning.glosses)[0].text)
     cue = (synonyms or broader_terms(synset) or [key_word(headword, [gloss.text for gloss in meaning.anchors])])[0]
-    picked = pick_definition(headword, meaning, ranked, writer, log)
-    if picked is None:
-        return None
-    definition, source = picked
-    related = related_terms(headword, meaning.pos, definition, synset, set(synonyms), use_neighbours) if len(synonyms) < MIN_SYNONYMS else []
+    definitions = [Candidate(gloss.text, gloss.source) for gloss in ranked[:CANDIDATES]]
+    definition = definitions[0] if definitions else Candidate("", "")
+    related = related_terms(headword, meaning.pos, definition.text or references[0], synset, set(synonyms), use_neighbours) if len(synonyms) < MIN_SYNONYMS else []
     antonyms = sorted({a.word().lemma() for sense in synset.senses() for a in sense.get_related("antonym")}) if synset else []
     examples = list(dict.fromkeys((gloss.source, example) for gloss in meaning.glosses for example in gloss.examples))
     key = synset.id if synset else hashlib.md5(meaning.glosses[0].text.encode()).hexdigest()[:12]
@@ -77,12 +65,14 @@ def describe(headword: str, meaning: Meaning, use_neighbours: bool, writer: Writ
         headword=headword,
         key=key,
         pos=meaning.pos,
-        definition=definition,
-        definition_source=source,
+        definition=definition.text,
+        definition_source=definition.source,
         cue=cue,
         synonyms=synonyms,
         related=related,
         antonyms=antonyms,
+        definitions=definitions,
+        references=references,
         examples=[Sentence("", example, origin) for origin, example in examples],
     )
 

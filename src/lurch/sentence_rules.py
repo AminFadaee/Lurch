@@ -41,8 +41,12 @@ def features(text: str, words: list[str]) -> tuple[float, float, float, int]:
     return readability, length, clean, sum(frequency < RARE_ZIPF for frequency in frequencies)
 
 
+def is_sentence(text: str) -> bool:
+    return text[:1].isupper() and text[-1:] in ".!?\"”"
+
+
 def usable(text: str, words: list[str]) -> bool:
-    return MIN_WORDS <= len(text.split()) <= MAX_WORDS and acceptable(text, words) and features(text, words)[2] >= MIN_CLEAN
+    return MIN_WORDS <= len(text.split()) <= MAX_WORDS and is_sentence(text) and acceptable(text, words) and features(text, words)[2] >= MIN_CLEAN
 
 
 def rule_score(text: str, words: list[str]) -> float:
