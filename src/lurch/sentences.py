@@ -1,24 +1,25 @@
 import bz2
-import re
 import urllib.request
 from pathlib import Path
 
 import numpy as np
 
-from lurch.entries import Entry, Sense, Sentence
-from lurch.models import embed, reranker
+from lurch.appropriate import inappropriate
+from lurch.entries import POS_NAMES, Entry, Sense, Sentence
+from lurch.fit import confident_assignment, fit_scores
+from lurch.judge import Judge
+from lurch.sentence_rules import MAX_WORDS, MIN_WORDS, rule_score, usable, word_pattern
+from lurch.writer import Writer
 
 TATOEBA_URL = "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences_detailed.tsv.bz2"
-MIN_WORDS, MAX_WORDS, TARGET_WORDS = 6, 22, 12
 MAX_DEFINITION_SIMILARITY = 0.8
-MIN_SCORE, MIN_MARGIN = 0.5, 0.2
 PER_SENSE = 3
-ABOUT_LANGUAGE = re.compile(
-    r"\b(translate|translation|spell|spelled|spelling|pronounce|word|words|synonym|dictionary|definition|defined|vocabulary)\b",
-    re.I,
-)
-
-Pool = list[tuple[str, str]]
+SCREENED = 4
+GENERATED = "generated"
+WRITER_ATTEMPTS = (1, 2)
+FIT_WEIGHT = 0.35
+DICTIONARY_BONUS = 0.15
+UNKNOWN_FIT = 0.5
 
 
 def download(cache_dir: Path) -> Path:
@@ -29,21 +30,6 @@ def download(cache_dir: Path) -> Path:
     return path
 
 
-def forms_pattern(words: list[str]) -> str:
-    return "|".join(rf"{re.escape(word)}(?:s|es|ly|ies)?" for word in words)
-
-
-def word_pattern(words: list[str]) -> re.Pattern:
-    return re.compile(rf"\b(?:{forms_pattern(words)})\b", re.I)
-
-
-def acceptable(text: str, words: list[str]) -> bool:
-    forms = forms_pattern(words)
-    quoted = re.search(rf"[\"“‘'«]\s*(?:{forms})\s*[\"”’'»]", text, re.I)
-    defining = re.search(rf"^(?:the\s+)?(?:{forms})\s+(?:is|are|was|means|refers)\b", text, re.I)
-    return not (quoted or defining or ABOUT_LANGUAGE.search(text))
-
-
 def read_sentences(path: Path):
     with bz2.open(path, "rt", encoding="utf-8") as lines:
         for line in lines:
@@ -52,48 +38,85 @@ def read_sentences(path: Path):
                 yield sentence_id, text
 
 
-def collect(entries: list[Entry], path: Path) -> dict[str, Pool]:
+def collect(entries: list[Entry], path: Path) -> dict[str, list[Sentence]]:
     patterns = {entry.word: word_pattern(entry.headwords) for entry in entries if entry.senses}
-    pools: dict[str, Pool] = {word: [] for word in patterns}
+    pools: dict[str, list[Sentence]] = {word: [] for word in patterns}
     by_word = {entry.word: entry for entry in entries}
     for sentence_id, text in read_sentences(path):
         for word, pattern in patterns.items():
-            if pattern.search(text) and acceptable(text, by_word[word].headwords):
-                pools[word].append((sentence_id, text))
+            if pattern.search(text) and usable(text, by_word[word].headwords):
+                pools[word].append(Sentence(sentence_id, text, "tatoeba"))
     return pools
 
 
-def rank_single(sense: Sense, pool: Pool) -> list[Sentence]:
-    headword = word_pattern([sense.headword])
-    vectors = embed([sense.definition] + [text for _, text in pool])
-    similarities = vectors[1:] @ vectors[0]
-    ordered = sorted(
-        zip(pool, similarities),
-        key=lambda item: (not headword.search(item[0][1]), abs(len(item[0][1].split()) - TARGET_WORDS)),
-    )
-    return [Sentence(sentence_id, text) for (sentence_id, text), similarity in ordered if similarity < MAX_DEFINITION_SIMILARITY][:PER_SENSE]
+def sigmoid(value: float) -> float:
+    return 1 / (1 + np.exp(-value / 2))
 
 
-def rank_multiple(entry: Entry, pool: Pool) -> None:
-    pairs = [(text, f"{sense.headword}: {sense.definition}") for _, text in pool for sense in entry.senses]
-    scores = np.array(reranker().predict(pairs, batch_size=32)).reshape(len(pool), len(entry.senses))
+def rank_candidates(entry: Entry, pool: list[Sentence]) -> list[list[tuple[float, Sentence]]]:
+    words = entry.headwords
+    definitions = [sense.definition for sense in entry.senses]
+    ranked: list[list[tuple[float, Sentence]]] = [[] for _ in entry.senses]
+    pattern = word_pattern(words)
     for column, sense in enumerate(entry.senses):
-        matches = []
-        for row, (sentence_id, text) in enumerate(pool):
-            order = np.argsort(-scores[row])
-            score, margin = float(scores[row][column]), float(scores[row][column] - scores[row][order[1]])
-            if order[0] == column and score >= MIN_SCORE and margin >= MIN_MARGIN:
-                matches.append(Sentence(sentence_id, text, round(score, 3), round(margin, 3)))
-        sense.sentences = sorted(matches, key=lambda sentence: -sentence.score)[:PER_SENSE]
+        for example in sense.examples:
+            if pattern.search(example.text) and usable(example.text, words):
+                score = FIT_WEIGHT * UNKNOWN_FIT + DICTIONARY_BONUS + rule_score(example.text, words)
+                ranked[column].append((score, example))
+    if pool:
+        combined, cosine = fit_scores(entry.senses[0].headword, [sentence.text for sentence in pool], definitions)
+        for row, column in enumerate(confident_assignment(combined)):
+            if column is not None and cosine[row][column] < MAX_DEFINITION_SIMILARITY:
+                score = FIT_WEIGHT * sigmoid(float(combined[row][column])) + rule_score(pool[row].text, words)
+                ranked[column].append((score, pool[row]))
+    seen: set[str] = set()
+    for column in ranked:
+        column.sort(key=lambda item: -item[0])
+        column[:] = [item for item in column if item[1].text.lower() not in seen and not seen.add(item[1].text.lower())]
+    return ranked
 
 
-def attach_sentences(entries: list[Entry], path: Path) -> None:
+def screen(candidates: list[Sentence]) -> list[Sentence]:
+    screened = []
+    for sentence in candidates:
+        if not inappropriate(sentence.text):
+            screened.append(sentence)
+        if len(screened) == SCREENED:
+            break
+    return screened
+
+
+def accepted(sense: Sense, candidates: list[Sentence], judge: Judge | None) -> list[Sentence]:
+    if not candidates:
+        return []
+    bad = judge.bad_sentences(sense.headword, POS_NAMES[sense.pos], sense.definition, [c.text for c in candidates]) if judge else set()
+    return [sentence for index, sentence in enumerate(candidates) if index not in bad]
+
+
+def generate(entry: Entry, sense: Sense, judge: Judge, writer: Writer) -> list[Sentence]:
+    pattern = word_pattern(entry.headwords)
+    for seed in WRITER_ATTEMPTS:
+        written = [text for text in writer.sentences(sense.headword, POS_NAMES[sense.pos], sense.definition, seed=seed)]
+        candidates = [Sentence("", text, GENERATED) for text in written if pattern.search(text) and usable(text, entry.headwords)]
+        candidates = sorted(candidates, key=lambda sentence: -rule_score(sentence.text, entry.headwords))
+        survivors = accepted(sense, screen(candidates), judge)
+        if survivors:
+            return survivors[:PER_SENSE]
+    return []
+
+
+def attach_sentences(entries: list[Entry], path: Path, judge: Judge | None, writer: Writer | None) -> None:
     pools = collect(entries, path)
     for entry in entries:
-        pool = pools.get(entry.word)
-        if not pool:
+        if not entry.senses:
             continue
-        if len(entry.senses) == 1:
-            entry.senses[0].sentences = rank_single(entry.senses[0], pool)
-        else:
-            rank_multiple(entry, pool)
+        ranked = rank_candidates(entry, pools.get(entry.word, []))
+        for sense, candidates in zip(entry.senses, ranked):
+            survivors = accepted(sense, screen([sentence for _, sentence in candidates]), judge)[:PER_SENSE]
+            if not survivors and writer and judge:
+                survivors = generate(entry, sense, judge, writer)
+            sense.sentences = survivors
+        evidenced = [sense for sense in entry.senses if sense.sentences]
+        if len(entry.senses) > 1 and evidenced:
+            entry.log += [f"dropped meaning without an acceptable sentence: {sense.cue or sense.pos}: {sense.definition}" for sense in entry.senses if not sense.sentences]
+            entry.senses = evidenced
