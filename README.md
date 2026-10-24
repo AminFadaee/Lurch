@@ -28,17 +28,17 @@ Later runs reuse them.
 
 ## Optional: local language models
 
-Without any model the pipeline uses only open dictionary and corpus data, and a meaning that has no good
-example sentence simply gets none. With [Ollama](https://ollama.com) you can add two models:
+Without any model the pipeline uses only open dictionary and corpus data, and takes the best-ranked definition
+and sentences. With [Ollama](https://ollama.com) you can add two models:
 
 | Variable | Role |
 |---|---|
-| `LURCH_JUDGE_MODEL` | reviews the example sentences picked from the open data and vetoes bad ones (vague, garbled, wrong meaning, about language) |
-| `LURCH_WRITER_MODEL` | writes example sentences only when no open-data sentence was accepted, and a definition only when every open-data definition is unusable |
+| `LURCH_WRITER_MODEL` | writes a plain definition and three example sentences for every meaning; its text is the default |
+| `LURCH_ARBITER_MODEL` | picks the best definition and the best example from the writer's text and the open candidates, over five shuffled votes; an open-data candidate replaces the writer's text only when it wins at least four of the five |
 
-I use `qwen3.5:4b` as the judge and `qwen3.5:9b` as the writer. Before it is used, the judge has to flag a
-few planted bad sentences; if it does not, the run continues without models. Every model answer is cached in
-`.cache/llm/`, so rerunning is cheap. A writer needs a judge.
+I use `qwen3.5:9b` as the writer and `qwen3.5:4b` as the arbiter. Models are optional and independent: with
+only a writer, its text is used as it is; with only an arbiter, it chooses between the open candidates. Every
+model answer is cached in `.cache/llm/`, so rerunning is cheap. Expect about a minute per meaning with both models.
 
 ## Configuration
 
@@ -49,7 +49,7 @@ Copy `.env.example` to `.env` to change a setting.
 | `LURCH_VOICES` | eight US Kokoro voices | comma-separated [Kokoro voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md); each word and sentence is read by one of them, chosen from a hash of its text |
 | `LURCH_DECK_NAME` | `Lurch Vocabulary` | name of the deck and the output file |
 | `LURCH_WORDS` | `words.txt` | the word list; `--words PATH` overrides it |
-| `LURCH_JUDGE_MODEL`, `LURCH_WRITER_MODEL` | empty | Ollama models, see above |
+| `LURCH_WRITER_MODEL`, `LURCH_ARBITER_MODEL` | empty | Ollama models, see above |
 | `LURCH_OLLAMA_URL` | `http://localhost:11434` | where Ollama runs |
 
 ## The cards
@@ -74,15 +74,16 @@ reads the previous step's `data/entries.json`.
 
 1. **Senses.** Takes the meanings from the English Wiktionary, joins the matching definitions from Simple
    English Wiktionary and WordNet, and keeps the three best supported. A definition built on the word itself
-   (*pedagogical*: "of or relating to pedagogy") is replaced by the base word's (*pedagogy*). Each meaning gets
-   one definition, chosen by plain wording, length and agreement between the sources. Synonyms come from
+   (*pedagogical*: "of or relating to pedagogy") is replaced by the base word's (*pedagogy*). The open
+   definitions are ranked by plain wording, length and agreement between the sources. Synonyms come from
    WordNet and from Wiktionary (only common words close in meaning); when there are fewer than two, broader
    terms and related words from GloVe vectors are added.
-2. **Sentences.** Collects the examples attached to each meaning in the dictionaries and the Tatoeba sentences
-   that a classifier confidently ties to a meaning. Sentences that quote the word, define it, talk about
-   language, are explicit or are hard to read are dropped; the rest are ranked, and the judge model, if
-   there is one, vetoes bad ones. If nothing is left, the writer model may write one. A meaning with no
-   acceptable sentence is dropped, unless it is the word's only meaning.
+2. **Sentences.** Collects the open candidates: the examples attached to each meaning in the dictionaries and
+   the Tatoeba sentences that a classifier confidently ties to a meaning, minus fragments, quotes, definitions, talk
+   about language, explicit content and hard-to-read text. The writer model, if there is one, adds its definition and
+   examples; examples that a classifier ties to a different meaning of the same word are dropped. The arbiter
+   then picks the best definition and example, and the first example becomes the main sentence, with a few
+   others kept under "More examples". A meaning without any sentence is dropped, unless it is the word's only one.
 3. **Audio.** Speaks the word and its main sentence with Kokoro.
 4. **Deck.** Writes the Anki package.
 
@@ -93,10 +94,10 @@ sentences missing.
 
 - The choices between near-equal definitions and sentences come from rules tuned on a handful of words, so
   expect some picks you would change.
-- Sentences written by a model are generic ("a clandestine meeting behind locked doors") but safe; they are
-  marked `generated` in `data/entries.json`.
-- A judge model is a noisy reviewer: it rejects good candidates and misses subtle ones, which is why it only
-  vetoes sentences and the rules do the ranking.
+- Text written by a model is plain but generic ("a clandestine meeting behind locked doors"); it is marked
+  `generated` in `data/entries.json`.
+- The arbiter is unstable between near-equal candidates, which is why an open candidate must win four votes of
+  five to replace the writer's text. Both models are Qwen, so it may favour the writer's style.
 - Word-vector neighbours describe a word in general, not one meaning, so they are only used for words with a
   single meaning.
 - Words that Wiktionary and WordNet do not know get no card.
