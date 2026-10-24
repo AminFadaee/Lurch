@@ -1,29 +1,28 @@
-from dataclasses import dataclass
+import hashlib
 
-from wn import Synset
-
-from lurch.circularity import classify
-from lurch.entries import Entry, Sense
+from lurch.circularity import classify, is_circular
+from lurch.config import Settings
+from lurch.definitions import CANDIDATES, MAX_WORDS, key_word, rank_definitions
+from lurch.entries import POS_NAMES, Entry, Sense, Sentence
+from lurch.inventory import Meaning, build_meanings
 from lurch.models import embed
-from lurch.related import broader_terms, dedupe_spellings, related_terms
+from lurch.related import broader_terms, dedupe_spellings, frequency, related_terms
+from lurch.wiktionary import Gloss
 from lurch.wordnet import english
+from lurch.writer import Writer
 
 PARTS_OF_SPEECH = "nvasr"
 SENSES_PER_WORD = 3
 MIN_SYNONYMS = 2
 MAX_SYNONYMS = 5
+MIN_SYNONYM_ZIPF = 3.0
+MIN_SYNONYM_SIMILARITY = 0.58
+GENERATED = "generated"
 
 
-@dataclass(frozen=True)
-class Candidate:
-    headword: str
-    synset: Synset
-    rank: int
-
-
-def resolve(word: str) -> tuple[list[Candidate], list[str]]:
-    candidates, log = [], []
-    for rank, synset in enumerate(english().synsets(word)):
+def resolve(word: str) -> tuple[list[str], list[str]]:
+    headwords, log = [], []
+    for synset in english().synsets(word):
         if word not in synset.lemmas() or synset.pos not in PARTS_OF_SPEECH:
             continue
         resolution = classify(word, synset)
@@ -32,51 +31,72 @@ def resolve(word: str) -> tuple[list[Candidate], list[str]]:
             continue
         if resolution.kind == "hop":
             log.append(f"hop: {word} -> {resolution.headword}: {resolution.synset.definition()}")
-        candidates.append(Candidate(resolution.headword, resolution.synset, rank))
-    return candidates, log
+        headwords.append(resolution.headword)
+    return list(dict.fromkeys(headwords)) or [word], log
 
 
-def pick_varied(candidates: list[Candidate]) -> list[Candidate]:
-    unique = sorted({candidate.synset.id: candidate for candidate in candidates}.values(), key=lambda c: c.rank)
-    if len(unique) <= SENSES_PER_WORD:
-        return unique
-    vectors = embed([candidate.synset.definition() for candidate in unique])
-    chosen = [0]
-    while len(chosen) < SENSES_PER_WORD:
-        rest = [i for i in range(len(unique)) if i not in chosen]
-        chosen.append(max(rest, key=lambda i: min(1 - vectors[i] @ vectors[j] for j in chosen)))
-    return [unique[i] for i in chosen]
+def single_words(headword: str, lemmas: list[str]) -> list[str]:
+    return [lemma for lemma in dict.fromkeys(lemmas) if lemma.lower() != headword and lemma.islower() and "-" not in lemma and " " not in lemma]
 
 
-def describe(candidate: Candidate, use_neighbours: bool) -> Sense:
-    synset, headword = candidate.synset, candidate.headword
-    synonyms = dedupe_spellings(
-        [lemma for lemma in synset.lemmas() if lemma.lower() != headword and lemma.islower() and "-" not in lemma and " " not in lemma]
-    )[:MAX_SYNONYMS]
-    related = related_terms(headword, synset, set(synonyms), use_neighbours) if len(synonyms) < MIN_SYNONYMS else []
-    antonyms = sorted({a.word().lemma() for sense in synset.senses() for a in sense.get_related("antonym")})
+def synonyms_of(headword: str, meaning: Meaning, definition: str) -> list[str]:
+    curated = single_words(headword, [lemma for gloss in meaning.glosses if gloss.source == "wordnet" for lemma in gloss.synonyms])
+    listed = [word for word in single_words(headword, [lemma for gloss in meaning.glosses if gloss.source == "wiktionary" for lemma in gloss.synonyms]) if frequency(word) >= MIN_SYNONYM_ZIPF]
+    if listed:
+        vectors = embed([definition] + listed)
+        listed = [word for word, similarity in sorted(zip(listed, vectors[1:] @ vectors[0]), key=lambda item: -item[1]) if similarity >= MIN_SYNONYM_SIMILARITY]
+    return dedupe_spellings(list(dict.fromkeys(curated + listed)))[:MAX_SYNONYMS]
+
+
+def pick_definition(headword: str, meaning: Meaning, ranked: list[Gloss], writer: Writer | None, log: list[str]) -> tuple[str, str] | None:
+    if ranked:
+        return ranked[0].text, ranked[0].source
+    if writer:
+        reference = [gloss.text for gloss in meaning.glosses][:CANDIDATES]
+        written = [text for text in writer.definitions(headword, POS_NAMES[meaning.pos], reference) if len(text.split()) <= MAX_WORDS and not is_circular(headword, text)]
+        if written:
+            return written[0], GENERATED
+    log.append(f"no acceptable definition for {headword} ({meaning.glosses[0].text})")
+    return None
+
+
+def describe(headword: str, meaning: Meaning, use_neighbours: bool, writer: Writer | None, log: list[str]) -> Sense | None:
+    synset = next((gloss.synset for gloss in meaning.glosses if gloss.synset is not None), None)
+    ranked = rank_definitions(headword, meaning)
+    synonyms = synonyms_of(headword, meaning, (ranked or meaning.glosses)[0].text)
+    cue = (synonyms or broader_terms(synset) or [key_word(headword, [gloss.text for gloss in meaning.anchors])])[0]
+    picked = pick_definition(headword, meaning, ranked, writer, log)
+    if picked is None:
+        return None
+    definition, source = picked
+    related = related_terms(headword, meaning.pos, definition, synset, set(synonyms), use_neighbours) if len(synonyms) < MIN_SYNONYMS else []
+    antonyms = sorted({a.word().lemma() for sense in synset.senses() for a in sense.get_related("antonym")}) if synset else []
+    examples = list(dict.fromkeys((gloss.source, example) for gloss in meaning.glosses for example in gloss.examples))
+    key = synset.id if synset else hashlib.md5(meaning.glosses[0].text.encode()).hexdigest()[:12]
     return Sense(
         headword=headword,
-        synset=synset.id,
-        pos=synset.pos,
-        definition=synset.definition(),
-        rank=candidate.rank,
-        cue=(synonyms or broader_terms(synset) or [""])[0],
+        key=key,
+        pos=meaning.pos,
+        definition=definition,
+        definition_source=source,
+        cue=cue,
         synonyms=synonyms,
         related=related,
         antonyms=antonyms,
+        examples=[Sentence("", example, origin) for origin, example in examples],
     )
 
 
-def build_entry(word: str) -> Entry:
-    candidates, log = resolve(word)
-    picked = pick_varied(candidates)
-    senses = [describe(candidate, use_neighbours=len(picked) == 1) for candidate in picked]
+def build_entry(word: str, settings: Settings, writer: Writer | None) -> Entry:
+    headwords, log = resolve(word)
+    meanings = [(headword, meaning) for headword in headwords for meaning in build_meanings(headword, settings.cache_dir)]
+    meanings = sorted(meanings, key=lambda item: -item[1].support)[:SENSES_PER_WORD]
+    senses = [sense for headword, meaning in meanings if (sense := describe(headword, meaning, len(meanings) == 1, writer, log))]
     if not senses:
-        log.append("no usable sense found")
-    headwords = {sense.headword for sense in senses}
-    return Entry(word, sorted(headwords | {word}), sorted({word} - headwords), senses, log)
+        log.append("no usable meaning found")
+    found = {sense.headword for sense in senses}
+    return Entry(word, sorted(found | {word}), sorted({word} - found), senses, log)
 
 
-def build_entries(words: list[str]) -> list[Entry]:
-    return [build_entry(word) for word in words]
+def build_entries(words: list[str], settings: Settings, writer: Writer | None) -> list[Entry]:
+    return [build_entry(word, settings, writer) for word in words]

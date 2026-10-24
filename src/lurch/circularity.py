@@ -18,6 +18,11 @@ class Resolution:
     headword: str | None = None
 
 
+def is_circular(word: str, definition: str) -> bool:
+    terms = circular_terms(word, definition)
+    return bool(terms) and len([t for t in content_terms(definition) if t not in terms]) < MIN_OTHER_TERMS
+
+
 def own_sense(word: str, synset: Synset):
     return next(sense for sense in synset.senses() if sense.word().lemma() == word)
 

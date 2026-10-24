@@ -3,32 +3,36 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
+POS_NAMES = {"n": "noun", "v": "verb", "a": "adjective", "r": "adverb"}
+
+
 @dataclass
 class Sentence:
     id: str
     text: str
-    score: float | None = None
-    margin: float | None = None
+    source: str = ""
 
 
 @dataclass
 class Sense:
     headword: str
-    synset: str
+    key: str
     pos: str
     definition: str
-    rank: int
+    definition_source: str
     cue: str
     synonyms: list[str]
     related: list[str]
     antonyms: list[str]
+    examples: list[Sentence] = field(default_factory=list)
     sentences: list[Sentence] = field(default_factory=list)
     word_audio: str = ""
     sentence_audio: str = ""
 
     @classmethod
     def from_dict(cls, data: dict) -> "Sense":
-        return cls(**{**data, "sentences": [Sentence(**sentence) for sentence in data["sentences"]]})
+        sentences = {name: [Sentence(**sentence) for sentence in data[name]] for name in ("examples", "sentences")}
+        return cls(**{**data, **sentences})
 
 
 @dataclass
