@@ -51,27 +51,17 @@ class Ollama:
 
 @cache
 def connect(settings: Settings):
-    from lurch.judge import Judge
+    from lurch.arbiter import Arbiter
     from lurch.writer import Writer
 
-    def warn(message: str) -> None:
-        print(message, file=sys.stderr)
-
-    judge = writer = None
-    if settings.judge_model:
-        llm = Ollama(settings.ollama_url, settings.judge_model, settings.cache_dir)
+    def available(model: str) -> Ollama | None:
+        if not model:
+            return None
+        llm = Ollama(settings.ollama_url, model, settings.cache_dir)
         if not llm.available():
-            warn(f"Judge model {settings.judge_model} is not available in Ollama; continuing without it")
-        elif not Judge(llm).self_check():
-            warn(f"Judge model {settings.judge_model} failed its self-check; continuing without it")
-        else:
-            judge = Judge(llm)
-    if settings.writer_model and judge:
-        llm = Ollama(settings.ollama_url, settings.writer_model, settings.cache_dir)
-        if llm.available():
-            writer = Writer(llm)
-        else:
-            warn(f"Writer model {settings.writer_model} is not available in Ollama; continuing without it")
-    elif settings.writer_model:
-        warn("A writer model needs a working judge model; continuing without generated text")
-    return judge, writer
+            print(f"Model {model} is not available in Ollama; continuing without it", file=sys.stderr)
+            return None
+        return llm
+
+    arbiter, writer = available(settings.arbiter_model), available(settings.writer_model)
+    return (Arbiter(arbiter) if arbiter else None), (Writer(writer) if writer else None)
