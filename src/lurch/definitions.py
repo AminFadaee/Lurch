@@ -39,8 +39,7 @@ def rank_definitions(headword: str, meaning: Meaning) -> list[Gloss]:
         for i, gloss in enumerate(unique)
         if not is_circular(headword, gloss.text) and not ANAPHORA.search(gloss.text)
     ]
-    ranked = [gloss for _, gloss in sorted(scored, key=lambda item: -item[0])]
-    return [gloss for gloss in ranked if len(gloss.text.split()) <= MAX_WORDS] or ranked
+    return [gloss for _, gloss in sorted(scored, key=lambda item: -item[0])]
 
 
 def key_word(headword: str, definitions: list[str]) -> str:

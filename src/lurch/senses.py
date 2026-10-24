@@ -2,7 +2,7 @@ import hashlib
 
 from lurch.circularity import classify
 from lurch.config import Settings
-from lurch.definitions import CANDIDATES, key_word, rank_definitions
+from lurch.definitions import CANDIDATES, MAX_WORDS, key_word, rank_definitions
 from lurch.entries import Candidate, Entry, Sense, Sentence
 from lurch.inventory import Meaning, build_meanings
 from lurch.models import embed
@@ -19,7 +19,7 @@ MIN_SYNONYM_SIMILARITY = 0.58
 
 
 def resolve(word: str) -> tuple[list[str], list[str]]:
-    headwords, log = [], []
+    headwords, log, clean = [], [], False
     for synset in english().synsets(word):
         if word not in synset.lemmas() or synset.pos not in PARTS_OF_SPEECH:
             continue
@@ -27,10 +27,11 @@ def resolve(word: str) -> tuple[list[str], list[str]]:
         if resolution.kind == "drop":
             log.append(f"dropped (circular): [{synset.pos}] {synset.definition()}")
             continue
+        clean = clean or resolution.kind == "clean"
         if resolution.kind == "hop":
             log.append(f"hop: {word} -> {resolution.headword}: {resolution.synset.definition()}")
         headwords.append(resolution.headword)
-    return list(dict.fromkeys(headwords)) or [word], log
+    return ([word] if clean else list(dict.fromkeys(headwords))) or [word], log
 
 
 def single_words(headword: str, lemmas: list[str]) -> list[str]:
@@ -48,7 +49,9 @@ def synonyms_of(headword: str, meaning: Meaning, definition: str) -> list[str]:
 
 def describe(headword: str, meaning: Meaning, use_neighbours: bool, writer: Writer | None, log: list[str]) -> Sense | None:
     synset = next((gloss.synset for gloss in meaning.glosses if gloss.synset is not None), None)
-    ranked = rank_definitions(headword, meaning)
+    everything = rank_definitions(headword, meaning)
+    concise = [gloss for gloss in everything if len(gloss.text.split()) <= MAX_WORDS]
+    ranked = concise or ([] if writer else everything)
     references = [gloss.text for gloss in meaning.glosses][:2]
     if not ranked and not writer:
         log.append(f"no usable definition for {headword} ({references[0]})")
