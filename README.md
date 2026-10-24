@@ -54,15 +54,18 @@ Copy `.env.example` to `.env` to change a setting.
 
 ## The cards
 
-Each meaning becomes one note with three cards:
+Each meaning becomes one note with two cards, styled like the [Ultimate Countries](https://github.com/AminFadaee/Ultimate-Countries)
+deck (light and dark):
 
 | Card | Front | Back |
 |---|---|---|
-| Recognition | the word, read aloud, and its example sentence | the definition, synonyms, related words, the word's other meanings and a collapsible list of more examples |
-| Recall | the definition, its synonyms and the sentence with the word blanked; you type the word | your spelling checked, the word and the full sentence read aloud |
-| Listening | the word read aloud, a button for the sentence as a hint; you type the word | your spelling checked, with the full meaning |
+| Meaning | the word, read aloud, its part of speech and its example sentence; you recall the meaning | the definition, the sentence read aloud, chips for synonyms, related words, opposites and the word's other forms, a collapsible list of more examples and the word's other meanings |
+| Listening | the word read aloud, with a button for the sentence as a hint; you type the word | your spelling checked, with the part of speech, the definition and the same chips |
 
-When a word has several meanings, a small cue on the card says which one it is, and the back lists the others.
+When a word has several meanings, a small cue after the part of speech (*noun · law*) says which one it is.
+
+A note has seven fields (`Word`, `Subtitle`, `Definition`, `Sentence`, `Details`, `WordAudio`, `SentenceAudio`) and
+none is ever empty: everything optional is gathered into `Details`.
 
 ## How it works
 

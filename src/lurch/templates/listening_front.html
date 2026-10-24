@@ -1,4 +1,5 @@
-<div class="label">Listen and type the word</div>
-<div class="word">{{WordAudio}}</div>
-{{#SentenceAudio}}<div class="label">Hint</div>{{SentenceAudio}}{{/SentenceAudio}}
-<br>{{type:Word}}
+<div class="entity">{{WordAudio}}</div>
+<hr class="divider">
+<div class="label">Word</div>
+<div class="value">{{type:Word}}</div>
+{{#SentenceAudio}}<div class="info">Hint {{SentenceAudio}}</div>{{/SentenceAudio}}

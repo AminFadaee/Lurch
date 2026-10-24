@@ -9,19 +9,14 @@ from lurch.audio import digest
 from lurch.config import Settings
 from lurch.entries import POS_NAMES, Entry, Sense
 
-MODEL_ID = 1607392319
-FIELDS = [
-    "Word", "Pos", "Cue", "Definition", "Synonyms", "Related", "Antonyms", "Forms", "OtherMeanings",
-    "Sentence", "MoreSentences", "SentenceCloze", "WordAudio", "SentenceAudio",
-]
-CARDS = ("recognition", "recall", "listening")
-INCLUDE = re.compile(r"<!--include:(\w+)-->")
+MODEL_ID = 1607392321
+FIELDS = ["Word", "Subtitle", "Definition", "Sentence", "Details", "WordAudio", "SentenceAudio"]
+CARDS = ("meaning", "listening")
 MIN_STEM = 4
 
 
 def read_template(name: str) -> str:
-    text = files("lurch").joinpath("templates", name).read_text(encoding="utf-8")
-    return INCLUDE.sub(lambda match: read_template(f"{match.group(1)}.html"), text)
+    return files("lurch").joinpath("templates", name).read_text(encoding="utf-8")
 
 
 def build_model() -> genanki.Model:
@@ -29,8 +24,7 @@ def build_model() -> genanki.Model:
         {"name": card.capitalize(), "qfmt": read_template(f"{card}_front.html"), "afmt": read_template(f"{card}_back.html")}
         for card in CARDS
     ]
-    css = files("lurch").joinpath("templates", "style.css").read_text(encoding="utf-8")
-    return genanki.Model(MODEL_ID, "Lurch Vocabulary", fields=[{"name": field} for field in FIELDS], templates=templates, css=css)
+    return genanki.Model(MODEL_ID, "Lurch Vocabulary", fields=[{"name": field} for field in FIELDS], templates=templates, css=read_template("style.css"))
 
 
 def stems(words: list[str]) -> str:
@@ -41,36 +35,31 @@ def highlight(sentence: str, words: list[str]) -> str:
     return re.sub(rf"\b((?:{stems(words)})\w*)", r"<b>\1</b>", html.escape(sentence), count=1, flags=re.I)
 
 
-def blank(sentence: str, words: list[str]) -> str:
-    return re.sub(rf"\b(?:{stems(words)})\w*", '<span class="blank">_____</span>', html.escape(sentence), count=1, flags=re.I)
-
-
-def chips(items: list[str]) -> str:
-    return "".join(f"<span>{html.escape(item)}</span>" for item in items)
+def chip(label: str, items: list[str]) -> str:
+    return f'<span class="chip"><i>{label}</i>{html.escape(", ".join(items))}</span>' if items else ""
 
 
 def sound(name: str) -> str:
     return f"[sound:{name}]" if name else ""
 
 
+def details(entry: Entry, sense: Sense) -> str:
+    chips = [chip("Synonyms", sense.synonyms[:4]), chip("Related", sense.related), chip("Opposite", sense.antonyms[:3]), chip("Also", entry.forms)]
+    facts = f'<div class="facts">{"".join(chips)}</div>' if any(chips) else ""
+    alternates = "".join(f'<div class="alt">{highlight(sentence.text, entry.headwords)}</div>' for sentence in sense.sentences[1:])
+    more = f'<details class="more"><summary>More examples</summary>{alternates}</details>' if alternates else ""
+    others = "".join(f"<div><b>{html.escape(other.cue or POS_NAMES[other.pos])}</b>: {html.escape(other.definition)}</div>" for other in entry.senses if other is not sense)
+    return facts + more + (f'<div class="others">{others}</div>' if others else "")
+
+
 def note_fields(entry: Entry, sense: Sense) -> list[str]:
-    sentence = sense.sentences[0].text if sense.sentences else ""
-    others = "".join(
-        f"<div><b>{html.escape(other.cue)}</b>: {html.escape(other.definition)}</div>" for other in entry.senses if other is not sense
-    )
+    cue = f" · {sense.cue}" if len(entry.senses) > 1 and sense.cue else ""
     values = {
         "Word": sense.headword,
-        "Pos": POS_NAMES[sense.pos],
-        "Cue": sense.cue if len(entry.senses) > 1 else "",
+        "Subtitle": POS_NAMES[sense.pos] + cue,
         "Definition": html.escape(sense.definition[:1].upper() + sense.definition[1:]),
-        "Synonyms": chips(sense.synonyms[:4]),
-        "Related": chips(sense.related),
-        "Antonyms": chips(sense.antonyms[:3]),
-        "Forms": ", ".join(entry.forms),
-        "OtherMeanings": others,
-        "Sentence": highlight(sentence, entry.headwords) if sentence else "",
-        "MoreSentences": "".join(f'<div class="alt">{highlight(more.text, entry.headwords)}</div>' for more in sense.sentences[1:]),
-        "SentenceCloze": blank(sentence, entry.headwords) if sentence else "",
+        "Sentence": highlight(sense.sentences[0].text, entry.headwords) if sense.sentences else "",
+        "Details": details(entry, sense),
         "WordAudio": sound(sense.word_audio),
         "SentenceAudio": sound(sense.sentence_audio),
     }
