@@ -12,11 +12,13 @@ from lurch.entries import POS_NAMES, Entry, Sense
 MODEL_ID = 1607392321
 FIELDS = ["Word", "Subtitle", "Definition", "Sentence", "Details", "WordAudio", "SentenceAudio"]
 CARDS = ("meaning", "word")
+INCLUDE = re.compile(r"<!--include:(\w+)-->")
 MIN_STEM = 4
 
 
 def read_template(name: str) -> str:
-    return files("lurch").joinpath("templates", name).read_text(encoding="utf-8")
+    text = files("lurch").joinpath("templates", name).read_text(encoding="utf-8")
+    return INCLUDE.sub(lambda match: read_template(f"{match.group(1)}.html").strip(), text)
 
 
 def build_model() -> genanki.Model:
@@ -61,7 +63,7 @@ def note_fields(entry: Entry, sense: Sense) -> list[str]:
         "Sentence": highlight(sense.sentences[0].text, entry.headwords) if sense.sentences else "",
         "Details": details(entry, sense),
         "WordAudio": sound(sense.word_audio),
-        "SentenceAudio": sound(sense.sentence_audio),
+        "SentenceAudio": sense.sentence_audio,
     }
     return [values[field] for field in FIELDS]
 

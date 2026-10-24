@@ -4,5 +4,5 @@
 <hr class="divider">
 <div class="label">Word</div>
 <div class="value answer" id="answer">{{type:Word}} {{WordAudio}}</div>
-{{#Sentence}}<div class="info sentence">{{Sentence}} {{SentenceAudio}}</div>{{/Sentence}}
+{{#Sentence}}<div class="info sentence">{{#SentenceAudio}}<!--include:player-->{{/SentenceAudio}}<span>{{Sentence}}</span></div>{{/Sentence}}
 {{Details}}
