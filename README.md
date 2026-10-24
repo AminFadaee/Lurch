@@ -26,6 +26,33 @@ The first run downloads about 7 GB of models and data (WordNet, GloVe vectors, t
 language models for matching, filtering and reranking, and the Kokoro voice model) and takes a few minutes.
 Later runs reuse them.
 
+## Example
+
+`words.example.txt` holds four words: *pedagogical*, *clandestine*, *serendipity* and *constitution*. Building it
+(`cp words.example.txt words.txt && uv run lurch build`) gives a deck whose cards look like this.
+
+**Meaning card**: the word, its part of speech and an example; you recall the meaning. *Pedagogical* was folded
+into its base word *pedagogy*, which is listed under "Also":
+
+![Meaning card for pedagogy](docs/samples/meaning-card.webp)
+
+**Word card**: the definition and synonyms as hints; you type the word:
+
+![Word card for clandestine](docs/samples/word-card.webp)
+
+**Several meanings**: *constitution* gets a card per meaning, a small cue says which one it is, and the other
+meanings are listed on the back, with further examples under "More examples":
+
+![Meaning card for constitution](docs/samples/several-meanings.webp)
+
+The word is read aloud when a card shows it; a sentence plays only when you press its ▶ button.
+
+## Adding words later
+
+Add words to `words.txt` (one per line) and run `uv run lurch build` again. Words you already built are quick,
+because the model answers are cached. Import the new `build/lurch_vocabulary.apkg` into Anki (File → Import): notes
+you already have keep their study progress, and the new words are added.
+
 ## Optional: local language models
 
 Without any model the pipeline uses only open dictionary and corpus data, and takes the best-ranked definition
@@ -74,8 +101,8 @@ deck (light and dark):
 
 | Card | Front | Back |
 |---|---|---|
-| Meaning | the word, read aloud, its part of speech and its example sentence; you recall the meaning | the definition, the sentence read aloud, chips for synonyms, related words, opposites and the word's other forms, a collapsible list of more examples and the word's other meanings |
-| Word | the definition with synonyms and related words as hints; you type the word | your spelling checked, the word and the sentence read aloud, and the same details |
+| Meaning | the word, read aloud, its part of speech and its example sentence (a ▶ button plays it); you recall the meaning | the definition, the example, chips for synonyms, related words, opposites and the word's other forms, a collapsible list of more examples and the word's other meanings |
+| Word | the definition with synonyms and related words as hints; you type the word | your spelling checked, the word read aloud, the example with its ▶ button, and the same details |
 
 When a word has several meanings, a small cue after the part of speech (*noun · law*) says which one it is.
 
@@ -100,7 +127,7 @@ reads the previous step's `data/entries.json`.
    of speech, are dropped, and meanings whose definitions are near-duplicates are merged. The arbiter
    then picks the best definition and example, and the first example becomes the main sentence, with a few
    others kept under "More examples". A meaning without any sentence is dropped, unless it is the word's only one.
-3. **Audio.** Speaks the word and its main sentence with Kokoro.
+3. **Audio.** Speaks the word and its main sentence with Kokoro; the word plays by itself and the sentence on a button.
 4. **Deck.** Writes the Anki package.
 
 The `senses` and `sentences` steps print what they changed: words folded into a base word, meanings dropped,
