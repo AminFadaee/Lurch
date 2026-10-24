@@ -31,9 +31,12 @@ def merged_pos(pos: str) -> str:
 
 def dedupe_spellings(words: list[str]) -> list[str]:
     kept: list[str] = []
-    for word in sorted(words, key=lambda w: -frequency(w)):
-        if all(SequenceMatcher(None, word, other).ratio() < SPELLING_VARIANT_RATIO for other in kept):
+    for word in words:
+        twin = next((i for i, other in enumerate(kept) if SequenceMatcher(None, word, other).ratio() >= SPELLING_VARIANT_RATIO), None)
+        if twin is None:
             kept.append(word)
+        elif frequency(word) > frequency(kept[twin]):
+            kept[twin] = word
     return kept
 
 
