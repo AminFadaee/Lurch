@@ -60,7 +60,7 @@ deck (light and dark):
 | Card | Front | Back |
 |---|---|---|
 | Meaning | the word, read aloud, its part of speech and its example sentence; you recall the meaning | the definition, the sentence read aloud, chips for synonyms, related words, opposites and the word's other forms, a collapsible list of more examples and the word's other meanings |
-| Listening | the word read aloud, with a button for the sentence as a hint; you type the word | your spelling checked, with the part of speech, the definition and the same chips |
+| Word | the definition with synonyms and related words as hints; you type the word | your spelling checked, the word and the sentence read aloud, and the same details |
 
 When a word has several meanings, a small cue after the part of speech (*noun · law*) says which one it is.
 

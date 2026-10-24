@@ -11,7 +11,7 @@ from lurch.entries import POS_NAMES, Entry, Sense
 
 MODEL_ID = 1607392321
 FIELDS = ["Word", "Subtitle", "Definition", "Sentence", "Details", "WordAudio", "SentenceAudio"]
-CARDS = ("meaning", "listening")
+CARDS = ("meaning", "word")
 MIN_STEM = 4
 
 
@@ -35,8 +35,8 @@ def highlight(sentence: str, words: list[str]) -> str:
     return re.sub(rf"\b((?:{stems(words)})\w*)", r"<b>\1</b>", html.escape(sentence), count=1, flags=re.I)
 
 
-def chip(label: str, items: list[str]) -> str:
-    return f'<span class="chip"><i>{label}</i>{html.escape(", ".join(items))}</span>' if items else ""
+def chip(label: str, items: list[str], kind: str) -> str:
+    return f'<span class="chip {kind}"><i>{label}</i>{html.escape(", ".join(items))}</span>' if items else ""
 
 
 def sound(name: str) -> str:
@@ -44,7 +44,7 @@ def sound(name: str) -> str:
 
 
 def details(entry: Entry, sense: Sense) -> str:
-    chips = [chip("Synonyms", sense.synonyms[:4]), chip("Related", sense.related), chip("Opposite", sense.antonyms[:3]), chip("Also", entry.forms)]
+    chips = [chip("Synonyms", sense.synonyms[:4], "hint"), chip("Related", sense.related, "hint"), chip("Opposite", sense.antonyms[:3], "detail"), chip("Also", entry.forms, "detail")]
     facts = f'<div class="facts">{"".join(chips)}</div>' if any(chips) else ""
     alternates = "".join(f'<div class="alt">{highlight(sentence.text, entry.headwords)}</div>' for sentence in sense.sentences[1:])
     more = f'<details class="more"><summary>More examples</summary>{alternates}</details>' if alternates else ""

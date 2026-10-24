@@ -27,3 +27,4 @@
 .more .alt b { color: var(--accent); }
 .others { font-size: 14px; line-height: 1.5; color: var(--muted); margin: 22px auto 0; max-width: 40em; text-align: left; }
 .others b { color: var(--text); font-weight: 600; }
+.only-hints .detail, .only-hints .more, .only-hints .others { display: none; }
