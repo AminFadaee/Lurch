@@ -45,7 +45,7 @@ meanings are listed on the back, with further examples under "More examples":
 
 ![Meaning card for constitution](docs/samples/several-meanings.webp)
 
-The word is read aloud when a card shows it; a sentence plays only when you press its ▶ button.
+The word is read aloud once, automatically (when the Meaning card appears, or when you reveal the Word card); a sentence plays only when you press its ▶ button.
 
 ## Adding words later
 
