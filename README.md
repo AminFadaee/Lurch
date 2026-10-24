@@ -36,9 +36,24 @@ and sentences. With [Ollama](https://ollama.com) you can add two models:
 | `LURCH_WRITER_MODEL` | writes a plain definition and three example sentences for every meaning; its text is the default |
 | `LURCH_ARBITER_MODEL` | picks the best definition and the best example from the writer's text and the open candidates, over five shuffled votes; an open-data candidate replaces the writer's text only when it wins at least four of the five |
 
-I use `qwen3.5:9b` as the writer and `qwen3.5:4b` as the arbiter. Models are optional and independent: with
-only a writer, its text is used as it is; with only an arbiter, it chooses between the open candidates. Every
-model answer is cached in `.cache/llm/`, so rerunning is cheap. Expect about a minute per meaning with both models.
+### Setting up the models
+
+1. Install Ollama from [ollama.com/download](https://ollama.com/download) and start it (it serves on `localhost:11434`).
+2. Pull the two models ([`qwen3.5`](https://ollama.com/library/qwen3.5) on the Ollama library):
+
+   ```sh
+   ollama pull qwen3.5:9b   # writer, 6.6 GB
+   ollama pull qwen3.5:4b   # arbiter, 3.4 GB
+   ```
+
+3. Enable them: `cp .env.example .env` (it already names these two models), then run `uv run lurch build`.
+
+Any other Ollama model can be used by changing the two variables; `ollama list` shows what you have. The models
+are separate from the first-run downloads above and need about 10 GB of disk. On my machine (a 4 GB GPU, so the
+9B model partly runs on the CPU) a meaning takes about a minute with both models; a bigger GPU will be faster.
+If a model is missing or Ollama is not running, the pipeline prints a warning and continues without it.
+The two models are independent: with only a writer its text is used as it is, and with only an arbiter it chooses
+between the open candidates. Every model answer is cached in `.cache/llm/`, so rerunning is cheap.
 
 ## Configuration
 
