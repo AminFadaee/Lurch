@@ -33,7 +33,7 @@ class Settings:
         voices = os.getenv("LURCH_VOICES", DEFAULT_VOICES).split(",")
         return cls(
             voices=tuple(voice.strip() for voice in voices if voice.strip()),
-            deck_name=os.getenv("LURCH_DECK_NAME", "Lurch Vocabulary"),
+            deck_name=os.getenv("LURCH_DECK_NAME", "English Vocabulary"),
             words_file=Path(os.getenv("LURCH_WORDS", "words.txt")),
             arbiter_model=os.getenv("LURCH_ARBITER_MODEL", ""),
             writer_model=os.getenv("LURCH_WRITER_MODEL", ""),

@@ -18,7 +18,7 @@ uv run lurch build
 ```
 
 Edit `words.txt` first: one word per line, `#` starts a comment. The deck is written to
-`build/lurch_vocabulary.apkg`; open it in Anki (File → Import).
+`build/english_vocabulary.apkg`; open it in Anki (File → Import).
 
 `words.txt`, `data/` and `build/` are git-ignored, so your list and your deck stay on your machine.
 
@@ -50,7 +50,7 @@ The word is read aloud when a card shows it; a sentence plays only when you pres
 ## Adding words later
 
 Add words to `words.txt` (one per line) and run `uv run lurch build` again. Words you already built are quick,
-because the model answers are cached. Import the new `build/lurch_vocabulary.apkg` into Anki (File → Import): notes
+because the model answers are cached. Import the new `build/english_vocabulary.apkg` into Anki (File → Import): notes
 you already have keep their study progress, and the new words are added.
 
 ## Optional: local language models
@@ -89,7 +89,7 @@ Copy `.env.example` to `.env` to change a setting.
 | Variable | Default | Meaning |
 |---|---|---|
 | `LURCH_VOICES` | eight US Kokoro voices | comma-separated [Kokoro voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md); each word and sentence is read by one of them, chosen from a hash of its text |
-| `LURCH_DECK_NAME` | `Lurch Vocabulary` | name of the deck and the output file |
+| `LURCH_DECK_NAME` | `English Vocabulary` | name of the deck and of the output file (`build/english_vocabulary.apkg`) |
 | `LURCH_WORDS` | `words.txt` | the word list; `--words PATH` overrides it |
 | `LURCH_WRITER_MODEL`, `LURCH_ARBITER_MODEL` | empty | Ollama models, see above |
 | `LURCH_OLLAMA_URL` | `http://localhost:11434` | where Ollama runs |

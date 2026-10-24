@@ -26,7 +26,7 @@ def build_model() -> genanki.Model:
         {"name": card.capitalize(), "qfmt": read_template(f"{card}_front.html"), "afmt": read_template(f"{card}_back.html")}
         for card in CARDS
     ]
-    return genanki.Model(MODEL_ID, "Lurch Vocabulary", fields=[{"name": field} for field in FIELDS], templates=templates, css=read_template("style.css"))
+    return genanki.Model(MODEL_ID, "English Vocabulary", fields=[{"name": field} for field in FIELDS], templates=templates, css=read_template("style.css"))
 
 
 def stems(words: list[str]) -> str:
