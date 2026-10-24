@@ -72,16 +72,17 @@ none is ever empty: everything optional is gathered into `Details`.
 `uv run lurch build` runs four steps; each can also be run alone (`senses`, `sentences`, `audio`, `deck`) and
 reads the previous step's `data/entries.json`.
 
-1. **Senses.** Takes the meanings from the English Wiktionary, joins the matching definitions from Simple
+1. **Senses.** Takes the meanings from the English Wiktionary (skipping obsolete, historical and wiki-only senses), joins the matching definitions from Simple
    English Wiktionary and WordNet, and keeps the three best supported. A definition built on the word itself
-   (*pedagogical*: "of or relating to pedagogy") is replaced by the base word's (*pedagogy*). The open
-   definitions are ranked by plain wording, length and agreement between the sources. Synonyms come from
+   (*pedagogical*: "of or relating to pedagogy") is replaced by the base word's (*pedagogy*), but only when the word has no sense of its own. The open
+   definitions of up to 18 words are ranked by plain wording, length and agreement between the sources. Synonyms come from
    WordNet and from Wiktionary (only common words close in meaning); when there are fewer than two, broader
    terms and related words from GloVe vectors are added.
 2. **Sentences.** Collects the open candidates: the examples attached to each meaning in the dictionaries and
    the Tatoeba sentences that a classifier confidently ties to a meaning, minus fragments, quotes, definitions, talk
    about language, explicit content and hard-to-read text. The writer model, if there is one, adds its definition and
-   examples; examples that a classifier ties to a different meaning of the same word are dropped. The arbiter
+   examples; examples that a classifier ties to a different meaning of the same word, or that use the word as another part
+   of speech, are dropped, and meanings whose definitions are near-duplicates are merged. The arbiter
    then picks the best definition and example, and the first example becomes the main sentence, with a few
    others kept under "More examples". A meaning without any sentence is dropped, unless it is the word's only one.
 3. **Audio.** Speaks the word and its main sentence with Kokoro.
