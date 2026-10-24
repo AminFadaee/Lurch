@@ -8,10 +8,12 @@ from lurch.config import Settings
 
 def run_senses(settings: Settings) -> None:
     from lurch.entries import save_entries
+    from lurch.llm import connect
     from lurch.senses import build_entries
     from lurch.words import read_words
 
-    entries = build_entries(read_words(settings.words_file))
+    _, writer = connect(settings)
+    entries = build_entries(read_words(settings.words_file), settings, writer)
     save_entries(settings.entries_file, entries)
     for entry in entries:
         for line in entry.log:
@@ -20,12 +22,16 @@ def run_senses(settings: Settings) -> None:
 
 def run_sentences(settings: Settings) -> None:
     from lurch.entries import load_entries, save_entries
+    from lurch.llm import connect
     from lurch.sentences import attach_sentences, download
 
+    judge, writer = connect(settings)
     entries = load_entries(settings.entries_file)
-    attach_sentences(entries, download(settings.cache_dir))
+    attach_sentences(entries, download(settings.cache_dir), judge, writer)
     save_entries(settings.entries_file, entries)
     for entry in entries:
+        for line in entry.log:
+            print(f"{entry.word}: {line}", file=sys.stderr)
         for sense in entry.senses:
             if not sense.sentences:
                 print(f"{sense.headword} ({sense.cue or sense.pos}): no example sentence", file=sys.stderr)
