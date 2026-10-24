@@ -7,13 +7,12 @@ import genanki
 
 from lurch.audio import digest
 from lurch.config import Settings
-from lurch.entries import Entry, Sense
+from lurch.entries import POS_NAMES, Entry, Sense
 
 MODEL_ID = 1607392319
-POS_NAMES = {"n": "noun", "v": "verb", "a": "adjective", "s": "adjective", "r": "adverb"}
 FIELDS = [
     "Word", "Pos", "Cue", "Definition", "Synonyms", "Related", "Antonyms", "Forms", "OtherMeanings",
-    "Sentence", "SentenceCloze", "WordAudio", "SentenceAudio",
+    "Sentence", "MoreSentences", "SentenceCloze", "WordAudio", "SentenceAudio",
 ]
 CARDS = ("recognition", "recall", "listening")
 INCLUDE = re.compile(r"<!--include:(\w+)-->")
@@ -70,6 +69,7 @@ def note_fields(entry: Entry, sense: Sense) -> list[str]:
         "Forms": ", ".join(entry.forms),
         "OtherMeanings": others,
         "Sentence": highlight(sentence, entry.headwords) if sentence else "",
+        "MoreSentences": "".join(f'<div class="alt">{highlight(more.text, entry.headwords)}</div>' for more in sense.sentences[1:]),
         "SentenceCloze": blank(sentence, entry.headwords) if sentence else "",
         "WordAudio": sound(sense.word_audio),
         "SentenceAudio": sound(sense.sentence_audio),
@@ -87,7 +87,7 @@ def build_deck(entries: list[Entry], settings: Settings) -> Path:
                 genanki.Note(
                     model=model,
                     fields=note_fields(entry, sense),
-                    guid=genanki.guid_for(sense.headword, sense.synset),
+                    guid=genanki.guid_for(sense.headword, sense.key),
                     tags=[f"pos::{POS_NAMES[sense.pos]}"],
                 )
             )

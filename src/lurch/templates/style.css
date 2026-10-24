@@ -18,5 +18,10 @@
 .web.rel span{border-style:dashed;border-color:#8a8f9c}
 .others{font-size:.85em;opacity:.8;text-align:left;margin-top:6px}
 .others div{margin:3px 0}
+.more{margin-top:16px;text-align:left}
+.more summary{cursor:pointer;text-align:center;opacity:.7;font-size:.85em}
+.more .alt{margin:8px 0;padding:10px 14px;border-left:3px solid #6c8cf5;background:rgba(108,140,245,.07);border-radius:0 10px 10px 0;font-size:.95em}
+.more .alt b{color:#c0392b}
+.nightMode .more .alt b{color:#ff8f7e}
 hr{border:none;border-top:1px solid rgba(128,128,128,.3);margin:20px 0}
 input{font-size:1em}
