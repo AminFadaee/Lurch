@@ -10,6 +10,8 @@ from lurch.entries import Entry
 
 SAMPLE_RATE = 24000
 REPO_ID = "hexgrad/Kokoro-82M"
+# Anki keeps media that no field references with [sound:] only when its name starts with an underscore
+BUTTON_PREFIX = "_"
 
 
 @cache
@@ -31,9 +33,9 @@ class Speaker:
         self.directory = directory
         directory.mkdir(parents=True, exist_ok=True)
 
-    def say(self, text: str) -> str:
+    def say(self, text: str, button: bool = False) -> str:
         voice = pick_voice(text, self.voices)
-        name = f"en-{digest(voice + text)[:16]}.mp3"
+        name = f"{BUTTON_PREFIX if button else ''}en-{digest(voice + text)[:16]}.mp3"
         path = self.directory / name
         if not path.exists():
             audio = np.concatenate([chunk for _, _, chunk in pipeline(voice[0])(text, voice=voice)])
@@ -45,4 +47,4 @@ def add_audio(entries: list[Entry], speaker: Speaker) -> None:
     for entry in entries:
         for sense in entry.senses:
             sense.word_audio = speaker.say(sense.headword)
-            sense.sentence_audio = speaker.say(sense.sentences[0].text) if sense.sentences else ""
+            sense.sentence_audio = speaker.say(sense.sentences[0].text, button=True) if sense.sentences else ""
