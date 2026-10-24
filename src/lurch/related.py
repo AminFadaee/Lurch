@@ -72,5 +72,5 @@ def related_terms(
     headword: str, pos: str, definition: str, synset: Synset | None, exclude: set[str], use_neighbours: bool, limit: int = 4
 ) -> list[str]:
     terms = broader_terms(synset) + (neighbour_terms(headword, pos, definition) if use_neighbours else [])
-    unique = [term for term in dict.fromkeys(terms) if term not in exclude and term != headword]
+    unique = [term for term in dict.fromkeys(terms) if term not in exclude and not overlaps(headword, term)]
     return dedupe_spellings(unique)[:limit]

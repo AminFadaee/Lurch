@@ -6,6 +6,7 @@ from lurch.definitions import CANDIDATES, MAX_WORDS, key_word, rank_definitions
 from lurch.entries import Candidate, Entry, Sense, Sentence
 from lurch.inventory import Meaning, build_meanings
 from lurch.models import embed
+from lurch.morphology import overlaps
 from lurch.related import broader_terms, dedupe_spellings, frequency, related_terms
 from lurch.wordnet import english
 from lurch.writer import Writer
@@ -35,7 +36,7 @@ def resolve(word: str) -> tuple[list[str], list[str]]:
 
 
 def single_words(headword: str, lemmas: list[str]) -> list[str]:
-    return [lemma for lemma in dict.fromkeys(lemmas) if lemma.lower() != headword and lemma.islower() and "-" not in lemma and " " not in lemma]
+    return [lemma for lemma in dict.fromkeys(lemmas) if lemma.islower() and "-" not in lemma and " " not in lemma and not overlaps(headword, lemma)]
 
 
 def synonyms_of(headword: str, meaning: Meaning, definition: str) -> list[str]:
