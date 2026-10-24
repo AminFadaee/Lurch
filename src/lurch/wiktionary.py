@@ -12,6 +12,8 @@ SIMPLE_URL = "https://simple.wiktionary.org/w/api.php?action=query&prop=extracts
 POS_CODES = {"noun": "n", "verb": "v", "adj": "a", "adjective": "a", "adv": "r", "adverb": "r"}
 SKIPPED_GLOSS = re.compile(r"^(alternative|obsolete|archaic|dated|misspelling|plural|present participle|past|eye dialect|nonstandard)", re.I)
 DATED_QUOTATION = re.compile(r"^\d{3,4}\b")
+OLD_FASHIONED_TAGS = {"obsolete", "archaic", "dated", "historical", "rare", "nonstandard", "dialectal", "slang", "vulgar", "offensive"}
+TECHNICAL_CATEGORIES = {"en:Wiki", "en:Internet", "en:Computing", "en:Programming", "en:Web"}
 LEADING_TAG = re.compile(r"^\([^)]*\)\s*")
 
 
@@ -58,7 +60,10 @@ def wiktionary_glosses(word: str, cache_dir: Path) -> list[Gloss]:
             continue
         for sense in entry.get("senses", []):
             text = (sense.get("glosses") or [""])[-1]
+            categories = {category.get("name", "") if isinstance(category, dict) else category for category in sense.get("categories", [])}
             if not text or SKIPPED_GLOSS.match(text) or "form_of" in sense or "alt_of" in sense:
+                continue
+            if OLD_FASHIONED_TAGS & set(sense.get("tags", [])) or TECHNICAL_CATEGORIES & categories:
                 continue
             examples = [usable_example(example.get("text", "")) for example in sense.get("examples", [])]
             glosses.append(
