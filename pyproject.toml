@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "sentence-transformers>=3.0",
     "soundfile>=0.12",
+    "spacy>=3.7",
     "torch>=2.4",
     "wn>=1.0",
     "wordfreq>=3.1",

@@ -12,7 +12,8 @@ from lurch.circularity import is_circular
 from lurch.definitions import MAX_WORDS as MAX_DEFINITION_WORDS
 from lurch.entries import POS_NAMES, Entry, Sense, Sentence
 from lurch.fit import confident_assignment, fit_scores
-from lurch.sentence_rules import MAX_WORDS, MIN_WORDS, rule_score, usable, word_pattern
+from lurch.models import embed
+from lurch.sentence_rules import MAX_WORDS, MIN_WORDS, fits_pos, rule_score, usable, word_pattern
 from lurch.writer import Writer
 
 TATOEBA_URL = "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences_detailed.tsv.bz2"
@@ -20,6 +21,7 @@ MAX_DEFINITION_SIMILARITY = 0.8
 PER_SENSE = 3
 STATIC_SENTENCES = 6
 GENERATED = "generated"
+DUPLICATE_SIMILARITY = 0.75
 FIT_WEIGHT = 0.35
 DICTIONARY_BONUS = 0.15
 UNKNOWN_FIT = 0.5
@@ -63,13 +65,13 @@ def rank_candidates(entry: Entry, pool: list[Sentence]) -> list[list[tuple[float
     pattern = word_pattern(words)
     for column, sense in enumerate(entry.senses):
         for example in sense.examples:
-            if pattern.search(example.text) and usable(example.text, words):
+            if pattern.search(example.text) and usable(example.text, words) and fits_pos(example.text, words, sense.pos):
                 score = FIT_WEIGHT * UNKNOWN_FIT + DICTIONARY_BONUS + rule_score(example.text, words)
                 ranked[column].append((score, example))
     if pool:
         combined, cosine = fit_scores(entry.senses[0].headword, [sentence.text for sentence in pool], definitions)
         for row, column in enumerate(confident_assignment(combined)):
-            if column is not None and cosine[row][column] < MAX_DEFINITION_SIMILARITY:
+            if column is not None and cosine[row][column] < MAX_DEFINITION_SIMILARITY and fits_pos(pool[row].text, words, entry.senses[column].pos):
                 score = FIT_WEIGHT * sigmoid(float(combined[row][column])) + rule_score(pool[row].text, words)
                 ranked[column].append((score, pool[row]))
     seen: set[str] = set()
@@ -95,7 +97,7 @@ def written_for(entry: Entry, sense: Sense, writer: Writer) -> tuple[str, list[S
     if not definition or len(definition.split()) > MAX_DEFINITION_WORDS or is_circular(sense.headword, definition):
         definition = ""
     pattern = word_pattern(entry.headwords)
-    usable_examples = [text for text in examples if pattern.search(text) and usable(text, entry.headwords)]
+    usable_examples = [text for text in examples if pattern.search(text) and usable(text, entry.headwords) and fits_pos(text, entry.headwords, sense.pos)]
     return definition, [Sentence("", text, GENERATED) for text in usable_examples if not inappropriate(text)]
 
 
@@ -135,11 +137,25 @@ def choose_definition(sense: Sense, written: str, votes: Counter) -> tuple[str, 
     return sense.definition, sense.definition_source
 
 
+def without_duplicates(entry: Entry, drafts: list) -> list:
+    if len(drafts) < 2:
+        return drafts
+    vectors = embed([definition or sense.definition for sense, definition, _ in drafts])
+    kept: list[int] = []
+    for index in range(len(drafts)):
+        original = next((k for k in kept if float(vectors[k] @ vectors[index]) >= DUPLICATE_SIMILARITY), None)
+        if original is None:
+            kept.append(index)
+        else:
+            entry.log.append(f"dropped duplicate meaning: {drafts[index][0].cue or drafts[index][0].pos} is close to {drafts[original][0].cue or drafts[original][0].pos}")
+    return [drafts[index] for index in kept]
+
+
 def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, writer: Writer | None) -> None:
     pools = collect(entries, path)
     for entry in entries:
         drafts = [(sense, *(written_for(entry, sense, writer) if writer else ("", []))) for sense in entry.senses]
-        drafts = [(sense, definition, examples) for sense, definition, examples in drafts if sense.definition or definition]
+        drafts = without_duplicates(entry, [(sense, definition, examples) for sense, definition, examples in drafts if sense.definition or definition])
         for sense, definition, _ in drafts:
             if not sense.definition:
                 sense.definition, sense.definition_source = definition, GENERATED
@@ -160,6 +176,11 @@ def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, 
             sense.sentences = order_sentences(static, generated[column], sentence_votes)
             main = sense.sentences[0].source if sense.sentences else "nothing"
             entry.log.append(f"{sense.headword} ({sense.cue or sense.pos}): definition from {sense.definition_source}, example from {main}")
+        firsts: set[str] = set()
+        for sense in entry.senses:
+            if sense.sentences and sense.sentences[0].text in firsts:
+                sense.sentences = sense.sentences[1:]
+            firsts |= {sense.sentences[0].text} if sense.sentences else set()
         evidenced = [sense for sense in entry.senses if sense.sentences]
         if len(entry.senses) > 1 and evidenced:
             entry.log += [f"dropped meaning without an acceptable sentence: {sense.cue or sense.pos}: {sense.definition}" for sense in entry.senses if not sense.sentences]

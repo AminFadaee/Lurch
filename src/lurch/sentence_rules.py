@@ -1,4 +1,5 @@
 import re
+from functools import cache
 
 import numpy as np
 from wordfreq import zipf_frequency
@@ -11,6 +12,7 @@ ABOUT_LANGUAGE = re.compile(
     r"\b(translate|translation|spell|spelled|spelling|pronounce|word|words|synonym|dictionary|definition|defined|vocabulary)\b",
     re.I,
 )
+POS_TAGS = {"n": {"NOUN", "PROPN"}, "v": {"VERB", "AUX"}, "a": {"ADJ"}, "r": {"ADV"}}
 DEFINING = re.compile(r"\b(means|refers to|is defined as|stands for|is a term|is known as|is when|is the term)\b", re.I)
 
 
@@ -52,3 +54,22 @@ def usable(text: str, words: list[str]) -> bool:
 def rule_score(text: str, words: list[str]) -> float:
     readability, length, clean, rare = features(text, words)
     return 0.2 * readability + 0.15 * length + 0.15 * clean - 0.15 * min(rare, MAX_RARE_PENALISED)
+
+
+@cache
+def parser():
+    try:
+        import spacy
+
+        return spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+    except (ImportError, OSError):
+        return None
+
+
+def fits_pos(text: str, words: list[str], pos: str) -> bool:
+    nlp = parser()
+    if nlp is None:
+        return True
+    pattern = word_pattern(words)
+    tags = {token.pos_ for token in nlp(text) if pattern.fullmatch(token.text)}
+    return not tags or bool(tags & POS_TAGS[pos])
