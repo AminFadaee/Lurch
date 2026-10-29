@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from lurch.config import Settings
+from lurch.hub import prepare
 
 
 def run_senses(settings: Settings) -> None:
@@ -64,5 +65,7 @@ def main() -> None:
     settings = Settings.load()
     if args.words:
         settings = replace(settings, words_file=args.words)
-    for step in STEPS.values() if args.command == "build" else [STEPS[args.command]]:
-        step(settings)
+    names = list(STEPS) if args.command == "build" else [args.command]
+    prepare(names)
+    for name in names:
+        STEPS[name](settings)

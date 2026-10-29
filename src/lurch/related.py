@@ -1,7 +1,10 @@
 from difflib import SequenceMatcher
 from functools import cache
 
+from pathlib import Path
+
 import gensim.downloader
+from gensim.models import KeyedVectors
 from wn import Synset
 from wordfreq import zipf_frequency
 
@@ -9,6 +12,7 @@ from lurch.models import embed
 from lurch.morphology import content_terms, overlaps
 from lurch.wordnet import english
 
+GLOVE = "glove-wiki-gigaword-100"
 MIN_ZIPF = 2.5
 MIN_SIMILARITY = 0.70
 NEIGHBOURS = 80
@@ -17,8 +21,9 @@ BROADER_TERMS = 2
 
 
 @cache
-def vectors():
-    return gensim.downloader.load("glove-wiki-gigaword-100")
+def vectors() -> KeyedVectors:
+    path = Path(gensim.downloader.base_dir) / GLOVE / f"{GLOVE}.gz"
+    return KeyedVectors.load_word2vec_format(path) if path.exists() else gensim.downloader.load(GLOVE)
 
 
 def frequency(word: str) -> float:

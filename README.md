@@ -24,7 +24,9 @@ Edit `words.txt` first: one word per line, `#` starts a comment. The deck is wri
 
 The first run downloads about 7 GB of models and data (WordNet, GloVe vectors, the Tatoeba sentences, four
 language models for matching, filtering and reranking, and the Kokoro voice model) and takes a few minutes.
-Later runs reuse them.
+Each Hugging Face model is downloaded once; afterwards runs use the local copy and make no Hugging Face requests,
+so they work offline (only words you have not built before are looked up on Wiktionary). The download may warn
+about unauthenticated requests; setting `HF_TOKEN` only makes it faster.
 
 ## Example
 
