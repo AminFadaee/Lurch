@@ -81,10 +81,10 @@ def rank_candidates(entry: Entry, pool: list[Sentence]) -> list[list[tuple[float
     return ranked
 
 
-def screen(candidates: list[Sentence], limit: int) -> list[Sentence]:
+def screen(candidates: list[Sentence], limit: int, words: list[str]) -> list[Sentence]:
     screened = []
     for sentence in candidates:
-        if not inappropriate(sentence.text):
+        if not inappropriate(sentence.text, tuple(words)):
             screened.append(sentence)
         if len(screened) == limit:
             break
@@ -98,7 +98,7 @@ def written_for(entry: Entry, sense: Sense, writer: Writer) -> tuple[str, list[S
         definition = ""
     pattern = word_pattern(entry.headwords)
     usable_examples = [text for text in examples if pattern.search(text) and usable(text, entry.headwords) and fits_pos(text, entry.headwords, sense.pos)]
-    return definition, [Sentence("", text, GENERATED) for text in usable_examples if not inappropriate(text)]
+    return definition, [Sentence("", text, GENERATED) for text in usable_examples if not inappropriate(text, tuple(entry.headwords))]
 
 
 def on_other_meaning(entry: Entry, generated: list[list[Sentence]]) -> list[list[Sentence]]:
@@ -165,7 +165,7 @@ def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, 
         ranked = rank_candidates(entry, pools.get(entry.word, []))
         generated = on_other_meaning(entry, [examples for _, _, examples in drafts])
         for column, (sense, written_definition, _) in enumerate(drafts):
-            static = screen([sentence for _, sentence in ranked[column]], STATIC_SENTENCES)
+            static = screen([sentence for _, sentence in ranked[column]], STATIC_SENTENCES, entry.headwords)
             definitions = [candidate.text for candidate in sense.definitions] + ([written_definition] if written_definition else [])
             sentences = [sentence.text for sentence in static + generated[column]]
             if arbiter and (len(definitions) > 1 or len(sentences) > 1):
