@@ -55,6 +55,15 @@ Add words to `words.txt` (one per line) and run `uv run lurch build` again. Word
 because the model answers are cached. Import the new `build/english_vocabulary.apkg` into Anki (File → Import): notes
 you already have keep their study progress, and the new words are added.
 
+## Choosing your own definition and sentence
+
+The pipeline picks one definition and one main sentence per meaning. When a meaning has several good options and you
+prefer another, run `uv run lurch review` after a build. It lists the candidates for each meaning (the current pick
+is marked `*`); type a number to choose, press Enter to keep it, or `q` to stop. It then rebuilds the audio and the
+deck itself. Your picks are saved in `choices.json` (git-ignored, like `words.txt`) and are applied again whenever
+you rebuild, so they are never overwritten. A build made before this feature existed has to run
+`uv run lurch sentences` once so that the candidates are stored.
+
 ## Optional: local language models
 
 Without any model the pipeline uses only open dictionary and corpus data, and takes the best-ranked definition
@@ -93,6 +102,7 @@ Copy `.env.example` to `.env` to change a setting.
 | `LURCH_VOICES` | eight US Kokoro voices | comma-separated [Kokoro voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md); each word and sentence is read by one of them, chosen from a hash of its text |
 | `LURCH_DECK_NAME` | `English Vocabulary` | name of the deck and of the output file (`build/english_vocabulary.apkg`) |
 | `LURCH_WORDS` | `words.txt` | the word list; `--words PATH` overrides it |
+| `LURCH_CHOICES` | `choices.json` | your picks from `lurch review` |
 | `LURCH_WRITER_MODEL`, `LURCH_ARBITER_MODEL` | empty | Ollama models, see above |
 | `LURCH_OLLAMA_URL` | `http://localhost:11434` | where Ollama runs |
 

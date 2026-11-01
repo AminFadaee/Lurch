@@ -6,6 +6,7 @@ REQUIRED = {
     "senses": ("BAAI/bge-base-en-v1.5",),
     "sentences": ("BAAI/bge-base-en-v1.5", "BAAI/bge-reranker-large", "cross-encoder/nli-deberta-v3-base", "facebook/bart-large-mnli"),
     "audio": ("hexgrad/Kokoro-82M",),
+    "review": ("hexgrad/Kokoro-82M",),
     "deck": (),
 }
 WEIGHTS = ("*.safetensors", "*.bin", "*.pth")

@@ -10,7 +10,7 @@ from lurch.appropriate import inappropriate
 from lurch.arbiter import Arbiter, clear_winner
 from lurch.circularity import is_circular
 from lurch.definitions import MAX_WORDS as MAX_DEFINITION_WORDS
-from lurch.entries import POS_NAMES, Entry, Sense, Sentence
+from lurch.entries import PER_SENSE, POS_NAMES, Candidate, Entry, Sense, Sentence
 from lurch.fit import confident_assignment, fit_scores
 from lurch.models import embed
 from lurch.sentence_rules import MAX_WORDS, MIN_WORDS, fits_pos, rule_score, usable, word_pattern
@@ -18,7 +18,6 @@ from lurch.writer import Writer
 
 TATOEBA_URL = "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences_detailed.tsv.bz2"
 MAX_DEFINITION_SIMILARITY = 0.8
-PER_SENSE = 3
 STATIC_SENTENCES = 6
 GENERATED = "generated"
 DUPLICATE_SIMILARITY = 0.75
@@ -173,6 +172,9 @@ def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, 
             else:
                 definition_votes = sentence_votes = Counter()
             sense.definition, sense.definition_source = choose_definition(sense, written_definition, definition_votes)
+            if written_definition and written_definition not in [candidate.text for candidate in sense.definitions]:
+                sense.definitions.append(Candidate(written_definition, GENERATED))
+            sense.candidates = list({sentence.text: sentence for sentence in generated[column] + static}.values())
             sense.sentences = order_sentences(static, generated[column], sentence_votes)
             main = sense.sentences[0].source if sense.sentences else "nothing"
             entry.log.append(f"{sense.headword} ({sense.cue or sense.pos}): definition from {sense.definition_source}, example from {main}")

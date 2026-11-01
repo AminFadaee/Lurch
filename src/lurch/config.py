@@ -12,6 +12,7 @@ class Settings:
     voices: tuple[str, ...]
     deck_name: str
     words_file: Path
+    choices_file: Path = Path("choices.json")
     arbiter_model: str = ""
     writer_model: str = ""
     ollama_url: str = "http://localhost:11434"
@@ -35,6 +36,7 @@ class Settings:
             voices=tuple(voice.strip() for voice in voices if voice.strip()),
             deck_name=os.getenv("LURCH_DECK_NAME", "English Vocabulary"),
             words_file=Path(os.getenv("LURCH_WORDS", "words.txt")),
+            choices_file=Path(os.getenv("LURCH_CHOICES", "choices.json")),
             arbiter_model=os.getenv("LURCH_ARBITER_MODEL", ""),
             writer_model=os.getenv("LURCH_WRITER_MODEL", ""),
             ollama_url=os.getenv("LURCH_OLLAMA_URL", "http://localhost:11434"),

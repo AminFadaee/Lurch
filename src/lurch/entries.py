@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 POS_NAMES = {"n": "noun", "v": "verb", "a": "adjective", "r": "adverb"}
+PER_SENSE = 3
 
 
 @dataclass
@@ -34,12 +35,13 @@ class Sense:
     references: list[str] = field(default_factory=list)
     examples: list[Sentence] = field(default_factory=list)
     sentences: list[Sentence] = field(default_factory=list)
+    candidates: list[Sentence] = field(default_factory=list)
     word_audio: str = ""
     sentence_audio: str = ""
 
     @classmethod
     def from_dict(cls, data: dict) -> "Sense":
-        sentences = {name: [Sentence(**sentence) for sentence in data[name]] for name in ("examples", "sentences")}
+        sentences = {name: [Sentence(**sentence) for sentence in data.get(name, [])] for name in ("examples", "sentences", "candidates")}
         return cls(**{**data, **sentences, "definitions": [Candidate(**candidate) for candidate in data["definitions"]]})
 
 
