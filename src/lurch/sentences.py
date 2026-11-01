@@ -136,25 +136,26 @@ def choose_definition(sense: Sense, written: str, votes: Counter) -> tuple[str, 
     return sense.definition, sense.definition_source
 
 
-def without_duplicates(entry: Entry, drafts: list) -> list:
-    if len(drafts) < 2:
-        return drafts
-    vectors = embed([definition or sense.definition for sense, definition, _ in drafts])
+def distinct(entry: Entry, items: list, texts: list[str], label) -> list:
+    if len(items) < 2:
+        return items
+    vectors = embed(texts)
     kept: list[int] = []
-    for index in range(len(drafts)):
-        original = next((k for k in kept if float(vectors[k] @ vectors[index]) >= DUPLICATE_SIMILARITY), None)
-        if original is None:
+    for index in range(len(items)):
+        twin = next((k for k in kept if float(vectors[k] @ vectors[index]) >= DUPLICATE_SIMILARITY), None)
+        if twin is None:
             kept.append(index)
         else:
-            entry.log.append(f"dropped duplicate meaning: {drafts[index][0].cue or drafts[index][0].pos} is close to {drafts[original][0].cue or drafts[original][0].pos}")
-    return [drafts[index] for index in kept]
+            entry.log.append(f"dropped duplicate meaning: {label(items[index])} is close to {label(items[twin])}")
+    return [items[index] for index in kept]
 
 
 def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, writer: Writer | None) -> None:
     pools = collect(entries, path)
     for entry in entries:
         drafts = [(sense, *(written_for(entry, sense, writer) if writer else ("", []))) for sense in entry.senses]
-        drafts = without_duplicates(entry, [(sense, definition, examples) for sense, definition, examples in drafts if sense.definition or definition])
+        drafts = [(sense, definition, examples) for sense, definition, examples in drafts if sense.definition or definition]
+        drafts = distinct(entry, drafts, [definition or sense.definition for sense, definition, _ in drafts], lambda draft: draft[0].cue or draft[0].pos)
         for sense, definition, _ in drafts:
             if not sense.definition:
                 sense.definition, sense.definition_source = definition, GENERATED
@@ -178,6 +179,7 @@ def attach_sentences(entries: list[Entry], path: Path, arbiter: Arbiter | None, 
             sense.sentences = order_sentences(static, generated[column], sentence_votes)
             main = sense.sentences[0].source if sense.sentences else "nothing"
             entry.log.append(f"{sense.headword} ({sense.cue or sense.pos}): definition from {sense.definition_source}, example from {main}")
+        entry.senses = distinct(entry, entry.senses, [sense.definition for sense in entry.senses], lambda sense: sense.cue or sense.pos)
         firsts: set[str] = set()
         for sense in entry.senses:
             if sense.sentences and sense.sentences[0].text in firsts:
