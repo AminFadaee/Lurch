@@ -13,6 +13,7 @@ class Settings:
     deck_name: str
     words_file: Path
     choices_file: Path = Path("choices.json")
+    ask: bool = True
     arbiter_model: str = ""
     writer_model: str = ""
     ollama_url: str = "http://localhost:11434"

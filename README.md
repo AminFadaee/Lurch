@@ -55,18 +55,21 @@ Add words to `words.txt` (one per line) and run `uv run lurch build` again. Word
 because the model answers are cached. Import the new `build/english_vocabulary.apkg` into Anki (File → Import): notes
 you already have keep their study progress, and the new words are added.
 
-The steps that work on built data (`sentences`, `audio`, `deck` and `review`) only use the words currently in
-`words.txt`, and say so when a listed word has not been built yet, so edit the list, then run `uv run lurch build`
-before `review`.
+The steps that work on built data (`sentences`, `audio` and `deck`) only use the words currently in `words.txt`, and
+say so when a listed word has not been built yet, so edit the list, then run `uv run lurch build`.
 
 ## Choosing your own definition and sentence
 
-The pipeline picks one definition and one main sentence per meaning. When a meaning has several good options and you
-prefer another, run `uv run lurch review` after a build. It lists the candidates for each meaning (the current pick
-is marked `*`); type a number to choose, press Enter to keep it, or `q` to stop. It then rebuilds the audio and the
-deck itself. Your picks are saved in `choices.json` (git-ignored, like `words.txt`) and are applied again whenever
-you rebuild, so they are never overwritten. A build made before this feature existed has to run
-`uv run lurch sentences` once so that the candidates are stored.
+`uv run lurch build` fetches the sources, runs the models, and then asks you before it makes the audio and the deck.
+For each meaning that has several good options, it lists the candidate definitions and sentences with the
+recommended one marked `*`. Type a number to choose another, press Enter to keep the recommended one, or type `a` to
+accept the recommended choice for everything that is left, which is what you want for a long word list. For a list
+you do not want to be asked about at all, use `uv run lurch build --recommended`; a build that is not running in a
+terminal does the same on its own.
+
+Your numbered choices are saved in `choices.json` (git-ignored, like `words.txt`) and applied again on every later
+build. A meaning you have been asked about is not asked about again. To change a choice later, delete its entry
+from `choices.json` and run `build` again.
 
 ## Optional: local language models
 
@@ -106,7 +109,7 @@ Copy `.env.example` to `.env` to change a setting.
 | `LURCH_VOICES` | eight US Kokoro voices | comma-separated [Kokoro voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md); each word and sentence is read by one of them, chosen from a hash of its text |
 | `LURCH_DECK_NAME` | `English Vocabulary` | name of the deck and of the output file (`build/english_vocabulary.apkg`) |
 | `LURCH_WORDS` | `words.txt` | the word list; `--words PATH` overrides it |
-| `LURCH_CHOICES` | `choices.json` | your picks from `lurch review` |
+| `LURCH_CHOICES` | `choices.json` | the definitions and sentences you chose while building |
 | `LURCH_WRITER_MODEL`, `LURCH_ARBITER_MODEL` | empty | Ollama models, see above |
 | `LURCH_OLLAMA_URL` | `http://localhost:11434` | where Ollama runs |
 
@@ -127,8 +130,8 @@ none is ever empty: everything optional is gathered into `Details`.
 
 ## How it works
 
-`uv run lurch build` runs four steps; each can also be run alone (`senses`, `sentences`, `audio`, `deck`) and
-reads the previous step's `data/entries.json`.
+`uv run lurch build` runs the steps below; four of them can also be run alone (`senses`, `sentences`, `audio`,
+`deck`) and read the previous step's `data/entries.json`.
 
 1. **Senses.** Takes the meanings from the English Wiktionary (skipping obsolete, historical and wiki-only senses), joins the matching definitions from Simple
    English Wiktionary and WordNet, and keeps the three best supported. A definition built on the word itself
