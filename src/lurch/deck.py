@@ -8,12 +8,12 @@ import genanki
 from lurch.audio import digest
 from lurch.config import Settings
 from lurch.entries import POS_NAMES, Entry, Sense
+from lurch.sentence_rules import word_pattern
 
 MODEL_ID = 1607392321
 FIELDS = ["Word", "Subtitle", "Definition", "Sentence", "Details", "WordAudio", "SentenceAudio"]
 CARDS = ("meaning", "word")
 INCLUDE = re.compile(r"<!--include:(\w+)-->")
-MIN_STEM = 4
 
 
 def read_template(name: str) -> str:
@@ -29,12 +29,8 @@ def build_model() -> genanki.Model:
     return genanki.Model(MODEL_ID, "English Vocabulary", fields=[{"name": field} for field in FIELDS], templates=templates, css=read_template("style.css"))
 
 
-def stems(words: list[str]) -> str:
-    return "|".join(re.escape(word[: max(MIN_STEM, len(word) - 3)]) for word in words)
-
-
 def highlight(sentence: str, words: list[str]) -> str:
-    return re.sub(rf"\b((?:{stems(words)})\w*)", r"<b>\1</b>", html.escape(sentence), count=1, flags=re.I)
+    return word_pattern(words).sub(r"<b>\g<0></b>", html.escape(sentence))
 
 
 def chip(label: str, items: list[str], kind: str) -> str:
