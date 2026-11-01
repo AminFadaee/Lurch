@@ -55,6 +55,10 @@ Add words to `words.txt` (one per line) and run `uv run lurch build` again. Word
 because the model answers are cached. Import the new `build/english_vocabulary.apkg` into Anki (File → Import): notes
 you already have keep their study progress, and the new words are added.
 
+The steps that work on built data (`sentences`, `audio`, `deck` and `review`) only use the words currently in
+`words.txt`, and say so when a listed word has not been built yet, so edit the list, then run `uv run lurch build`
+before `review`.
+
 ## Choosing your own definition and sentence
 
 The pipeline picks one definition and one main sentence per meaning. When a meaning has several good options and you
